@@ -1,0 +1,170 @@
+---
+title: "APG vignette"
+author: "Jean-Philippe Vert"
+date: "21 septembre 2015"
+output: html_document
+---
+
+<!-- 
+%\VignetteEngine{knitr::knitr} 
+%\VignetteIndexEntry{An Introduction to APG}
+--> 
+
+### Introduction
+APG is a simple package to minimize functions of the form
+$$
+\min_{x \in \mathbb{R}^p} \,\,f(x) = g(x) + h(x)\,,
+$$
+where
+
+* $g$ is convex and differentiable (i.e., smooth),
+* $h$ is convex but not necessarily differentiable.
+
+Such functions are common in high-dimensional statistical inference, where $g(x)$ typically represents the risk of a model $x$ (squared error, negative log-likelihood) and $h(x)$ a penalty to promote a particular structure on $x$ (such as the $\ell_1$ norm to make it sparse, or the trace norm to make it low-rank if it is a matrix). 
+
+To solve this problem, `apg` implements an accelerated proximal gradient (APG) method, which offers a good compromise in terms of simplicity and performance. APG is a first-order method only requires
+
+* the gradient of $g$, namely $\nabla g (x)$
+* the proximal operator of $h$, namely $prox_h(x,t) = argmin_v (th(v) + 1/2 ||x-v||^2)$
+
+APG is therefore interesting when the proximal operator of $h$ can be easily computed. This is for example the case for the $\ell_1$ norm, whose proximal operator is the soft-thresholding operator.
+
+The `apg` package is not supposed to be particularly efficient, because it is implemented in pure R. The benefit is that it can be easily manipulated and adapted to particular functions $g$ and $h$, by simply defining their gradient and proximal operators as R functions. It can be a useful tool for prototyping your algorithm, or solving small- to medium-scale problems.
+
+### Estimating GLM with structured sparsity inducing penalties
+
+A typical example where APG is useful is to estimate generalized linear models with non-smooth penalties inducing particular structures on the model. `apg` therefore has a built-in function to do that for you, implementing several popular log-likelihoods and penalties. 
+
+We consider $n$ training samples $x_1,\ldots,x_n \in \mathbb{R}^p$, and $n$ response variables $y_1,\ldots,y_n$ that can be continuous for regression or binary ($\pm 1$) for binary classification. For a linear model $\beta\in\mathbb{R}^p$, potentially with an offset $\beta_0\in\mathbb{R}$, `apg` implements the following loss function (i.e., negative log-likelihood in the language of GLM):
+
+* When $y$ is continuous, the Gaussian model, corresponding to __sum of squared error__: 
+$$
+g(\beta, \beta_0) = \frac{1}{2n}\sum_{i=1}^n \left(y_i - \beta^\top x_i - \beta_0\right)^2 \,.
+$$
+* When $y$ is binary, the __logistic regression model__:
+$$
+g(\beta,\beta_0) = \frac{1}{n} \sum_{i=1}^n \log \left( 1 + \exp(- y_i ( \beta^\top x_i + \beta_0)) \right)
+$$
+
+As for penalties, APG implements the following:
+
+* __Elastic net__: for $\alpha \in [0,1]$,
+$$
+h(\beta) = \frac{1 - \alpha}{2} ||\beta||_2^2 + \alpha ||\beta||_1 \,.
+$$
+For $\alpha=0$, this is simply the ridge penalty $h(\beta)=1/2 ||\beta||_2^2$, while for $\alpha=1$ this is simply the lasso penalty $h(\beta) = ||\beta||_1$.
+* __Group lasso (without overlap)__: for a set of groups $g_1,\ldots,g_G$ which form a partition of the indices $\{1, \ldots, p\}$, and a set of weights $w_1, \ldots, w_G$:
+$$
+h(\beta) = \sum_{i=1}^G w_i ||\beta_{g_i}||_2 \,.
+$$
+* __Isotonic constraint__: when we want to learn a model with non-decrasing weights,
+$$
+h(\beta) = 
+\begin{cases}
+0 & \text{when }\beta_1 \leq \ldots \leq \beta_p\,,\\
++\infty & \text{otherwise.}
+\end{cases}
+$$
+
+A call to `glm.apg` allows to minimize a combination of a negative log-likelihood function $g(\beta,\beta_0)$ and a penalty $h(\beta)$ of the form
+$$
+\min_{\beta, \beta_0} f(\beta, \beta_0) = g(\beta, \beta_0) + \lambda h(\beta) \,.
+$$
+
+To illustrate the use of `glm.apg`, let us create a toy example:
+```{r}
+n <- 100
+p <- 5
+x <- matrix(rnorm(n*p),n,p)
+y <- rbinom(n,1,0.5)*2-1
+lambda <- 0.2*max(abs(crossprod(y,x)))/n
+```
+To solve a standard lasso regression problem, simply type:
+```{r}
+library(apg)
+m <- glm.apg(x, y, lambda=lambda)
+m
+```
+
+Note that you can get the same from the `glmnet` package:
+```{r}
+library(glmnet)
+m2 <- glmnet(x, y, standardize=FALSE, lambda=lambda)
+coef(m2)
+```
+
+By default the loss function of `glm.apg` is the sum of squared errors, and the penalty is the elastic net with $\alpha=1$, namely the $\ell_1$ penalty. We therefore get the standard lasso regression. To change the penalty and/or the loss function, we can give more arguments to `glm.apg`. For example, to just replace the $\ell_1$ penalty by a more general elastic net penalty, we give it a different $\alpha$ value as field of an optional list parameter called `opts`:
+```{r}
+# Ridge regression with intercept:
+m <- glm.apg(x, y, lambda=lambda, opts=list(alpha=0))
+m
+# Does the same as
+m2 <- glmnet(x, y, standardize=FALSE, lambda=lambda, alpha=0)
+coef(m2) 
+# Elastic net regression with intercept:
+m <- glm.apg(x, y, lambda=lambda, opts=list(alpha=0.5))
+m
+# Does the same as
+m2 <- glmnet(x, y, standardize=FALSE, lambda=lambda, alpha=0.5)
+coef(m2)
+```
+By default, we add an unpenalized intercept $\beta_0$ to the model. If you do not want to have an intercept, set the `intercept` parameter to `FALSE`:
+```{r}
+# Elastic net regression without intercept:
+m <- glm.apg(x, y, lambda=lambda, intercept=FALSE, opts=list(alpha=0.5))
+m
+# Does the same as
+m2 <- glmnet(x, y, standardize=FALSE, lambda=lambda, alpha=0.5, intercept=FALSE)
+coef(m2)
+```
+To change the loss function, change the `family` parameter. For example, to replace the squared error by a logistic regression:
+```{r}
+# Lasso penalized logistic regression with intercept:
+m <- glm.apg(x, y, family="binomial", lambda=lambda)
+m
+# Does the same as
+m2 <- glmnet(x, y, family="binomial", lambda=lambda, standardize=FALSE)
+coef(m2)
+# Elastic net penalized logistic regression with intercept:
+m <- glm.apg(x, y, family="binomial", lambda=lambda, opts=list(alpha=0.5))
+m
+# Does the same as
+m2 <- glmnet(x, y, family="binomial", lambda=lambda, standardize=FALSE, alpha=0.5)
+coef(m2)
+```
+Finally, to change the penalty, change the `penalty` parameter. For example, to learn a non-decreasing model:
+```{r}
+# Isotonic regression with offset
+m <- glm.apg(x, y, penalty="isotonic", lambda=lambda)
+m
+# Isotonic logistic regression with offset
+m <- glm.apg(x, y, family="binomial", penalty="isotonic", lambda=lambda)
+m
+```
+
+### Writing your own function to optimize
+The function that performs the optimization is `apg`. It takes as arguments the gradient of $g$, the proximal operator of $h$, the dimension of the unknown, and additional optional parameters. The additional parameters are passed to the calls of the gradient and proximal. To write your own problem, you simply need to define a gradient and a proximal function, and pass them to `apg`.
+
+For example, to learn a non-negative model, you may want to define the penalty:
+$$
+h(x) = 
+\begin{cases}
+0 & \text{if} x_i \geq 0 \text{ for }i=1,\ldots,p\\
++\infty & \text{otherwise.}
+\end{cases}
+$$
+
+The corresponding proximal operator is the projection onto the non-negative orthant, which we can define in `R` as follows:
+```{r}
+myprox <- function(x, ...) {
+    u <- x
+    u[x<0] <- 0
+    return(u)
+}
+```
+Note that although our prox only requires `x` as argument, we add dots since it will be called with additional arguments (step size, options) that are not used here. We can now optimize a logistic regression model with non-negativity constraints as follows:
+```{r}
+m <- apg(grad.logistic, myprox, p, opts=list(A=x, b=y))
+m
+```
+Note that we borrowed the gradient of the logistic loss from the package, and give it its paramaters (design matrix `x` and response `y`) throught he `opts` list. `apg` returns a list with two elements: `x`, the solution of our problem (i.e., what we call $\beta$), and `t`, which is the final step size parameter of the optimization that can be useful to keep if you want to re-run the optimization with similar parameter. `apg` accepts a bunch of other parameters (in particular to set the initial step size) described in the function description.
