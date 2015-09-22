@@ -1,8 +1,16 @@
 Package: apg
-Title: What the Package Does (one line, title case)
-Version: 0.0.0.9000
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-Depends: R (>= 3.2.0)
-License: What license is it under?
+Title: Optimization with accelerated proximal gradient
+Version: 0.1.0
+Date: 2015-09-15
+Authors@R: person("Jean-Philippe", "Vert",
+    email = "jean-philippe.vert@mines.org", role = c("aut", "cre"))
+Description: This package implements a general routine for minimization of a 
+    composite function with accelerated proximal gradient, as well as some
+    examples of such functions useful in statistics and machine learning.
+Depends: R (>= 3.2.0), Iso
+License: Artistic-2.0
 LazyData: true
+URL: https://github.com/jpvert/apg
+BugReports: https://github.com/jpvert/apg/issues
+Suggests: knitr, glmnet
+VignetteBuilder: knitr
