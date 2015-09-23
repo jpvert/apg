@@ -57,8 +57,11 @@
 #' 
 #' # Isotonic logistic regression with offset
 #' m <- glm.apg(x, y, family="binomial", penalty="isotonic", lambda=lambda)
+#' 
+#' # Isotonic logistic regression with offset, with non-decreasing model of bounded norm
+#' m <- glm.apg(x, y, family="binomial", penalty="boundednondecreasing", lambda=lambda, opts=list(maxnorm=2))
 
-glm.apg <- function(x, y, family=c("gaussian", "binomial"), penalty=c("elasticnet","isotonic"), lambda=1, intercept=TRUE, opts=list()) {
+glm.apg <- function(x, y, family=c("gaussian", "binomial"), penalty=c("elasticnet", "isotonic", "boundednondecreasing"), lambda=1, intercept=TRUE, opts=list()) {
     family <- match.arg(family)
     penalty <- match.arg(penalty)
     y <- drop(y)
@@ -80,7 +83,7 @@ glm.apg <- function(x, y, family=c("gaussian", "binomial"), penalty=c("elasticne
     gradG <- switch(family, gaussian = grad.quad, binomial = grad.logistic)
     
     # Prox of the nonsmooth part
-    proxH <- switch(penalty, elasticnet = prox.elasticnet, isotonic = prox.isotonic)
+    proxH <- switch(penalty, elasticnet = prox.elasticnet, isotonic = prox.isotonic, boundednondecreasing = prox.boundednondecreasing)
     
     o <- opts
     

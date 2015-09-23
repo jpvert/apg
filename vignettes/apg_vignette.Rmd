@@ -65,6 +65,14 @@ h(\beta) =
 +\infty & \text{otherwise.}
 \end{cases}
 $$
+* __Bounded non-decreasing__: when we want to learn a model with non-decrasing and bounded weights,
+$$
+h(\beta) = 
+\begin{cases}
+0 & \text{when }\beta_1 \leq \ldots \leq \beta_p \text{ and }||\beta||_2 \leq M\,,\\
++\infty & \text{otherwise.}
+\end{cases}
+$$
 
 A call to `glm.apg` allows to minimize a combination of a negative log-likelihood function $g(\beta,\beta_0)$ and a penalty $h(\beta)$ of the form
 $$
@@ -139,6 +147,12 @@ m <- glm.apg(x, y, penalty="isotonic", lambda=lambda)
 m
 # Isotonic logistic regression with offset
 m <- glm.apg(x, y, family="binomial", penalty="isotonic", lambda=lambda)
+m
+mnorm <- sqrt(sum(m$b^2))
+# Isotonic logistic regression with offset, with non-decreasing model of bounded norm
+m <- glm.apg(x, y, family="binomial", penalty="boundednondecreasing", lambda=lambda, opts=list(maxnorm=mnorm))
+m
+m <- glm.apg(x, y, family="binomial", penalty="boundednondecreasing", lambda=lambda, opts=list(maxnorm=mnorm/2))
 m
 ```
 
