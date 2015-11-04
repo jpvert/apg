@@ -1,0 +1,73 @@
+---
+title: "Breast cancer prognosis"
+author: "Jean-Philippe Vert"
+date: "Nov 3, 2015"
+output: html_document
+---
+
+We illustrate the use of ranking logistic regression for survival data on a problem of breast cancer prognosis from gene expression data.
+```{r}
+set.seed(1234)
+mc.cores <- 6
+
+require("compareC")
+# Download some data
+if (!is.element("breastCancerTRANSBIG", installed.packages()[,1])) {
+    source("https://bioconductor.org/biocLite.R")
+    biocLite("breastCancerTRANSBIG")
+}
+require(breastCancerTRANSBIG)
+data(transbig)
+
+# Expression data (predictors)
+x <- t(exprs(transbig))
+y <- pData(transbig)[,c("t.os","e.os")]
+
+# Keep only genes with large variations across patients
+nkeep <- 5000
+keep <- order(-apply(x,2,var))[1:nkeep]
+x <- x[,keep]
+
+# Make train/test splits
+n <- nrow(x)
+nrepeats <- 10
+nfolds <- 3
+folds <- list()
+for (i in seq(nrepeats)) {
+    folds <- c(folds,split(sample(seq(n)), rep(1:nfolds, length = n)))
+}
+nexp <- length(folds)
+
+# Regularization parameter
+lambda <- 2^seq(-9,5)
+nlambda <- length(lambda)
+
+# Alpha values
+alpha <- c(0,0.5,1)
+nalpha <- length(alpha)
+alphaname <- c('Ridge','Elastic net','Lasso')
+
+
+# Main loop (done in parallel on several cores)
+cilist <- mclapply(seq(nexp), function(iexp){
+    cat('.')
+    itest <- folds[[iexp]]
+    itrain <- seq(n)[-itest]
+    ci <- matrix(nrow=nlambda, ncol=nalpha)
+    for (ialpha in seq(nalpha)) {
+        for (ilambda in seq(nlambda)) {
+            # Fit survival model
+            m <- glm.apg(x[itrain,], y[itrain,], family="survival", lambda=lambda[ilambda], opts=list(alpha=alpha[ialpha]))
+
+            # Compute concordance index on test set
+            ci[ilambda,ialpha] <- estC(y[itest,1],y[itest,2],x[itest,]%*%m$b)
+        }
+    }
+    return(ci)
+},
+mc.cores=mc.cores)
+
+# Pretty plot
+mci <- apply(array(unlist(cilist), dim = c(nrow(cilist[[1]]), ncol(cilist[[1]]), length(cilist))), c(1,2), mean)
+matplot(log(lambda), mci, type="l", lty=1, lwd=2, main="Breast cancer metastasis prognosis", ylab="CI",xlab="log(lambda)")
+legend("bottomleft", legend=alphaname, col=seq(nalpha), lty=1, lwd=2)
