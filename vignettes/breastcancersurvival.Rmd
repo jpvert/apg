@@ -71,3 +71,4 @@ mc.cores=mc.cores)
 mci <- apply(array(unlist(cilist), dim = c(nrow(cilist[[1]]), ncol(cilist[[1]]), length(cilist))), c(1,2), mean)
 matplot(log(lambda), mci, type="l", lty=1, lwd=2, main="Breast cancer metastasis prognosis", ylab="CI",xlab="log(lambda)")
 legend("bottomleft", legend=alphaname, col=seq(nalpha), lty=1, lwd=2)
+```

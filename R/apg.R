@@ -72,6 +72,9 @@ apg <- function(grad_f, prox_h, dim_x, opts) {
     x <- X_INIT
     y <- x
     g <- grad_f(y, opts)
+    if (norm_vec(g) < EPS) {
+        return(list(x=x,t=0))
+    }
     theta <- 1
 
     # Initial step size
