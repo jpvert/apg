@@ -90,9 +90,10 @@ glm.apg <- function(x, y, family=c("gaussian", "binomial", "survival"), penalty=
 
     o <- opts
 
-    # If a non-penalized intercept is added, just add a constant column to x and modify the prox operator of the penalty to not touch the coefficient corresponding to the constant column
+    # If a non-penalized intercept is added, just add a constant column to x and modify the prox operator of the penalty to not touch the coefficient corresponding to the constant column. We also work on the centered matrix x to speed up convergence.
     if (intercept) {
-        o$A <- cbind(x, rep(1,n))
+        centered.x <- scale(x, scale = FALSE)
+        o$A <- cbind(centered.x, rep(1,n))
         myproxH <- function(u, ...) {
             return(c(proxH(u[-length(u)], ...), u[length(u)]))
         }
@@ -113,7 +114,7 @@ glm.apg <- function(x, y, family=c("gaussian", "binomial", "survival"), penalty=
 
     # Return the model (vector of weight in b, intercept in a0)
     if (intercept) {
-        return(list(b=w[-length(w)], a0=w[length(w)]))
+        return(list(b=w[-length(w)], a0=w[length(w)] - sum(w[-length(w)] * attr(centered.x, "scaled:center"))))
     } else {
         return(list(b=w, a0=0))
     }
