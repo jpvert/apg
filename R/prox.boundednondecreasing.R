@@ -31,7 +31,7 @@ prox.boundednondecreasing <- function(x, t=0, opts=list()) {
     }
     # We first project onto the set of non-decreasing vectors using isotonic
     # regression, then onto the unit Euclidean ball.
-    u <- pava(x)
+    u <- isoreg(x)$yf
     unorm <- sqrt(sum(u^2))
     if (unorm > M) {
         return(M*u/unorm)
