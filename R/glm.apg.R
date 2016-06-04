@@ -83,7 +83,7 @@ glm.apg <- function(x, y, family=c("gaussian", "binomial", "survival"), penalty=
         vnames = paste("V", seq(n), sep = "")
 
     # Gradient of the smooth part
-    gradG <- switch(family, gaussian = grad.quad, binomial = grad.logistic, survival = grad.rankinglogistic)
+    gradG <- switch(family, gaussian = grad.quad, binomial = grad_logistic, survival = grad.rankinglogistic)
 
     # Prox of the nonsmooth part
     proxH <- switch(penalty, elasticnet = prox.elasticnet, isotonic = prox.isotonic, boundednondecreasing = prox.boundednondecreasing)
@@ -93,12 +93,12 @@ glm.apg <- function(x, y, family=c("gaussian", "binomial", "survival"), penalty=
     # If a non-penalized intercept is added, just add a constant column to x and modify the prox operator of the penalty to not touch the coefficient corresponding to the constant column. We also work on the centered matrix x to speed up convergence.
     if (intercept) {
         centered.x <- scale(x, scale = FALSE)
-        o$A <- cbind(centered.x, rep(1,n))
+	o <- append(list(A=cbind(centered.x, rep(1,n))), o)
         myproxH <- function(u, ...) {
             return(c(proxH(u[-length(u)], ...), u[length(u)]))
         }
     } else {
-        o$A <- x
+        o <- append(list(A=x), o)
         myproxH <- proxH
     }
 
